@@ -131,10 +131,7 @@ suite('TeletypePackage', function () {
 
     // No transitivity: When Portal 1 host is viewing contents of Portal 2, Portal 1 guests are placed on hold
     assert.equal(hostAndGuestEnv.workspace.getActivePaneItem(), hostAndGuestRemotePaneItem)
-    await condition(() =>
-      getRemotePaneItems(guestOnlyEnv).length === 1 &&
-        getRemotePaneItems(guestOnlyEnv)[0] instanceof EmptyPortalPaneItem
-    )
+    await condition(() => deepEqual(getPaneItems(guestOnlyEnv), [guestOnlyRemotePaneItem1]))
   })
 
   test('guest sharing another portal as a host', async () => {
@@ -153,8 +150,8 @@ suite('TeletypePackage', function () {
     assert.deepEqual(getPaneItems(guestAndHostEnv), [guestAndHostRemotePaneItem1])
 
     // While already participating as a guest in Portal 1, share a new portal as a host (Portal 2)
-    const guestAndHostLocalEditor = await guestAndHostEnv.workspace.open(path.join(temp.path(), 'host+guest'))
-    assert.deepEqual(getPaneItems(guestAndHostEnv), [guestAndHostRemotePaneItem1, guestAndHostLocalEditor])
+    const guestAndHostLocalEditor1 = await guestAndHostEnv.workspace.open(path.join(temp.path(), 'host+guest-buffer-1'))
+    assert.deepEqual(getPaneItems(guestAndHostEnv), [guestAndHostRemotePaneItem1, guestAndHostLocalEditor1])
     const portal2Id = (await guestAndHostPackage.sharePortal()).id
     guestOnlyPackage.joinPortal(portal2Id)
     const guestOnlyRemotePaneItem1 = await getNextRemotePaneItemPromise(guestOnlyEnv)
@@ -164,25 +161,24 @@ suite('TeletypePackage', function () {
     // Portal 2 host continues to exist as a guest in Portal 1
     hostOnlyEnv.workspace.open(path.join(temp.path(), 'host-only-buffer-2'))
     const guestAndHostRemotePaneItem2 = await getNextRemotePaneItemPromise(guestAndHostEnv)
-    assert.deepEqual(getPaneItems(guestAndHostEnv), [guestAndHostRemotePaneItem2, guestAndHostLocalEditor])
+    assert.deepEqual(getPaneItems(guestAndHostEnv), [guestAndHostRemotePaneItem1, guestAndHostLocalEditor1, guestAndHostRemotePaneItem2])
     assert.deepEqual(getPaneItems(guestOnlyEnv), [guestOnlyRemotePaneItem1])
 
-    // No transitivity: When Portal 2 host is viewing contents of Portal 1, Portal 2 guests are placed on hold
+    // No transitivity: When Portal 2 host is viewing contents of Portal 1, Portal 2 guests can only see contents of Portal 2
     guestAndHostEnv.workspace.getActivePane().activateItemAtIndex(0)
-    assert.equal(guestAndHostEnv.workspace.getActivePaneItem(), guestAndHostRemotePaneItem2)
-    await condition(() =>
-      getRemotePaneItems(guestOnlyEnv).length === 1 &&
-        getRemotePaneItems(guestOnlyEnv)[0] instanceof EmptyPortalPaneItem
-    )
+    assert.equal(guestAndHostEnv.workspace.getActivePaneItem(), guestAndHostRemotePaneItem1)
+    assert.deepEqual(getPaneItems(guestOnlyEnv), [guestOnlyRemotePaneItem1])
 
-    // Portal 2 guests remain on hold while Portal 2 host observes changes in Portal 1
+    // As Portal 2 host observes changes in Portal 1, Portal 2 guests continue to only see contents of Portal 2
     await hostOnlyEnv.workspace.open(path.join(temp.path(), 'host-only-buffer-3'))
     const guestAndHostRemotePaneItem3 = await getNextRemotePaneItemPromise(guestAndHostEnv)
-    assert.deepEqual(getPaneItems(guestAndHostEnv), [guestAndHostRemotePaneItem3, guestAndHostLocalEditor])
-    await condition(() =>
-      getRemotePaneItems(guestOnlyEnv).length === 1 &&
-        getRemotePaneItems(guestOnlyEnv)[0] instanceof EmptyPortalPaneItem
-    )
+    assert.deepEqual(getPaneItems(guestAndHostEnv), [guestAndHostRemotePaneItem1, guestAndHostRemotePaneItem3, guestAndHostLocalEditor1, guestAndHostRemotePaneItem2])
+    assert.deepEqual(getPaneItems(guestOnlyEnv), [guestOnlyRemotePaneItem1])
+
+    // When Portal 2 host shares another local buffer, Portal 2 guests see that buffer
+    const guestAndHostLocalEditor2 = await guestAndHostEnv.workspace.open(path.join(temp.path(), 'host+guest-buffer-2'))
+    const guestOnlyRemotePaneItem2 = await getNextRemotePaneItemPromise(guestOnlyEnv)
+    assert.deepEqual(getPaneItems(guestOnlyEnv), [guestOnlyRemotePaneItem1, guestOnlyRemotePaneItem2])
   })
 
   test('host attempting to share another portal', async () => {
